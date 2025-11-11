@@ -8,7 +8,9 @@ from typing import List, Dict, Tuple
 # Configuration
 IMAGE_FOLDER: str = "./images"
 FRAME_DURATION: int = 2000  # milliseconds between frames
-TARGET_SIZE: Tuple[int, int] = (1920, 1080)
+WIDTH: int = 1920
+TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
+print(f"Making GIFs in ({TARGET_SIZE[0]}, {TARGET_SIZE[1]})")
 
 # If True create a GIF such that one Artist appears at the start for each GIF
 # IF False, only create 1 GIF
