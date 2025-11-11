@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple
 
 # Configuration
 IMAGE_FOLDER: str = "./images"
-FRAME_DURATION: int = 2000  # milliseconds between frames
+FRAME_DURATION: int = 5000  # milliseconds between frames
 WIDTH: int = 1920
 TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
 print(f"Making GIFs in ({TARGET_SIZE[0]}, {TARGET_SIZE[1]})")
