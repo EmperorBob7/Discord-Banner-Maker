@@ -1,87 +1,101 @@
 import os
 import random
-
-from PIL import Image
+from PIL import Image, ImageSequence
 import pprint
 from typing import List, Dict, Tuple
 
-# Configuration
 IMAGE_FOLDER: str = "./images"
-FRAME_DURATION: int = 5000  # milliseconds between frames
-WIDTH: int = 1920
+FRAME_DURATION: int = 3000
+WIDTH: int = 960 # Minimum resolution is 960x540, Size Max is 10MB
 TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
-print(f"Making GIFs in ({TARGET_SIZE[0]}, {TARGET_SIZE[1]})")
 
-# If True create a GIF such that one Artist appears at the start for each GIF
-# IF False, only create 1 GIF
 ONE_A_DAY = True
 
 def get_images(folder: str) -> List[str]:
-    """Get all image file paths in the folder."""
     exts: tuple = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
     return [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(exts)]
 
 def group_images(images: List[str]) -> Dict[str, List[str]]:
-    """Group images by the first word before '#'."""
     groups: Dict[str, List[str]] = {}
     for img in images:
-        filename_og: str = os.path.basename(img)
-        filename: str = os.path.splitext(filename_og)[0]
+        filename_og = os.path.basename(img)
+        filename = os.path.splitext(filename_og)[0]
         if '#' in filename:
-            group_name: str = filename.split('#')[0].lower()
+            group_name = filename.split('#')[0].lower()
         else:
-            group_name: str = filename.lower()  # single-image group if no '#'
-        
-        if group_name not in groups:
-          groups[group_name] = []
-        groups[group_name].append(img)
+            group_name = filename.lower()
+        groups.setdefault(group_name, []).append(img)
     pprint.pprint(groups)
     return groups
+
+def load_image_preserving_gif(path: str) -> Tuple[List[Image.Image], List[int]]:
+    """Load an image. If GIF, preserve all frames + durations."""
+    img = Image.open(path)
+
+    if img.format == "GIF":
+        frames = []
+        durations = []
+
+        for frame in ImageSequence.Iterator(img):
+            frames.append(
+                frame.convert("RGBA").resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+            )
+            durations.append(frame.info.get("duration", FRAME_DURATION))
+
+        return frames, durations
+
+    # Non-gif -> single frame image
+    frame = img.convert("RGBA").resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+    return [frame], [FRAME_DURATION]
 
 def main() -> None:
     os.makedirs("./outputGifs", exist_ok=True)
 
-    images: List[str] = get_images(IMAGE_FOLDER)
-    
-    grouped_images_dict: Dict[str, List[str]] = group_images(images)
-    grouped_images: List[List[str]] = list(grouped_images_dict.values())
-    random.shuffle(grouped_images)
+    images = get_images(IMAGE_FOLDER)
+    grouped = list(group_images(images).values())
+    random.shuffle(grouped)
 
-    # Shuffle images within each group
-    for group in grouped_images:
+    for group in grouped:
         random.shuffle(group)
 
-    # Load Images
-    grouped_loaded_images: List[List[Image.Image]] = []
-    for group in grouped_images:
-        arr: List[Image.Image] = []
-        for image in group:
-            arr.append(Image.open(image).convert('RGBA').resize(TARGET_SIZE, Image.Resampling.LANCZOS))
-        grouped_loaded_images.append(arr)
+    # Load all images + durations
+    grouped_frames = []
+    grouped_durations = []
 
-    num_gifs = len(grouped_loaded_images)
+    for group in grouped:
+        frames = []
+        durations = []
+        for path in group:
+            f, d = load_image_preserving_gif(path)
+            frames.extend(f)
+            durations.extend(d)
+        grouped_frames.append(frames)
+        grouped_durations.append(durations)
+
+    num_gifs = len(grouped_frames)
+
     for index in range(num_gifs):
-        # Flatten List
-        pil_images: List[Image.Image] = [img for group in grouped_loaded_images for img in group]
-        
-        # Save as GIF
-        if pil_images:
+        frames = [f for group in grouped_frames for f in group]
+        durations = [d for group in grouped_durations for d in group]
+
+        if frames:
             OUTPUT_GIF = f"./outputGifs/File{index}.gif"
-            pil_images[0].save(
+            frames[0].save(
                 OUTPUT_GIF,
                 save_all=True,
-                append_images=pil_images[1:],
-                duration=FRAME_DURATION,
-                loop=0  # loop forever
+                append_images=frames[1:],
+                duration=durations,
+                loop=0
             )
-            print(f"GIF saved as {OUTPUT_GIF} with {len(pil_images)} frames.")
-        
+            print(f"Saved {OUTPUT_GIF} with {len(frames)} frames.")
+
         if not ONE_A_DAY:
             break
 
-        # Cycle the Carousel
-        group_pop = grouped_loaded_images.pop(0)
-        grouped_loaded_images.append(group_pop)
+        # rotate groups
+        grouped_frames.append(grouped_frames.pop(0))
+        grouped_durations.append(grouped_durations.pop(0))
+
 
 if __name__ == "__main__":
     main()
