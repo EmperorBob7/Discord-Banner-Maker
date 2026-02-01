@@ -65,7 +65,9 @@ def main() -> None:
     for group in grouped:
         frames = []
         durations = []
-        for path in group:
+        sorted_group = sorted(group)
+        print(f"Sorted Group: {sorted_group}")
+        for path in sorted_group:
             f, d = load_image_preserving_gif(path)
             frames.extend(f)
             durations.extend(d)
