@@ -1,3 +1,4 @@
+import math
 import os
 import random
 from PIL import Image, ImageSequence
@@ -6,24 +7,29 @@ from typing import List, Dict, Tuple
 
 IMAGE_FOLDER: str = "./images"
 FRAME_DURATION: int = 3000
-WIDTH: int = 960 # Minimum resolution is 960x540, Size Max is 10MB
+WIDTH: int = 1920 # Minimum resolution is 960x540, Size Max is 10MB
 TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
 
-ONE_A_DAY = True
+NUM_BANNERS = 3 # 0 for one for every artist, X otherwise
+SEGREGATE_GIFS = True # False if you want all banners in every gif
 
 def get_images(folder: str) -> List[str]:
     exts: tuple = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
     return [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(exts)]
+
+def get_group_name(filename: str):
+    if '#' in filename:
+        group_name = filename.split('#')[0].lower()
+    else:
+        group_name = filename.lower()
+    return group_name
 
 def group_images(images: List[str]) -> Dict[str, List[str]]:
     groups: Dict[str, List[str]] = {}
     for img in images:
         filename_og = os.path.basename(img)
         filename = os.path.splitext(filename_og)[0]
-        if '#' in filename:
-            group_name = filename.split('#')[0].lower()
-        else:
-            group_name = filename.lower()
+        group_name = get_group_name(filename)
         groups.setdefault(group_name, []).append(img)
     pprint.pprint(groups)
     return groups
@@ -51,21 +57,22 @@ def load_image_preserving_gif(path: str) -> Tuple[List[Image.Image], List[int]]:
 def main() -> None:
     os.makedirs("./outputGifs", exist_ok=True)
 
-    images = get_images(IMAGE_FOLDER)
-    grouped = list(group_images(images).values())
+    images: List[str] = get_images(IMAGE_FOLDER)
+    grouped: list[List[str]] = list(group_images(images).values())
     random.shuffle(grouped)
 
-    for group in grouped:
-        random.shuffle(group)
+    for frames_group in grouped:
+        random.shuffle(frames_group)
 
     # Load all images + durations
-    grouped_frames = []
-    grouped_durations = []
+    grouped_frames: List[List[Image.Image]] = []
+    grouped_durations: List[List[int]] = []
+    grouped_names: List[str] = []
 
-    for group in grouped:
-        frames = []
-        durations = []
-        sorted_group = sorted(group)
+    for frames_group in grouped:
+        frames: List[Image.Image] = []
+        durations: List[int] = []
+        sorted_group = sorted(frames_group)
         print(f"Sorted Group: {sorted_group}")
         for path in sorted_group:
             f, d = load_image_preserving_gif(path)
@@ -73,13 +80,40 @@ def main() -> None:
             durations.extend(d)
         grouped_frames.append(frames)
         grouped_durations.append(durations)
+        grouped_names.append(get_group_name(frames_group[0]))
 
-    num_gifs = len(grouped_frames)
+    num_artists = len(grouped_names)
+    num_gifs = NUM_BANNERS
+    if NUM_BANNERS is 0:
+        num_gifs = num_artists
 
+    artists_per_gif = num_artists
+    if SEGREGATE_GIFS:
+        artists_per_gif = math.ceil(num_artists / num_gifs) 
+
+    seg_total_artists = 0
     for index in range(num_gifs):
-        frames = [f for group in grouped_frames for f in group]
-        durations = [d for group in grouped_durations for d in group]
-
+        frames: List[Image.Image] = []
+        durations: List[int] = []
+        names: List[str] = []
+        for artist_index in range(artists_per_gif):
+            if SEGREGATE_GIFS and seg_total_artists >= num_artists:
+                break
+            seg_total_artists += 1
+            # Rounding
+            if artist_index >= num_artists:
+                break
+            # Accumulate Frames
+            frames_group = grouped_frames[artist_index]
+            for f in frames_group:
+                frames.append(f)
+            # Accumulate Durations
+            durations_group = grouped_durations[artist_index]
+            for d in durations_group:
+                durations.append(d)
+            names.append(grouped_names[artist_index])
+        
+        # Make the gif
         if frames:
             OUTPUT_GIF = f"./outputGifs/File{index}.gif"
             frames[0].save(
@@ -89,14 +123,16 @@ def main() -> None:
                 duration=durations,
                 loop=0
             )
-            print(f"Saved {OUTPUT_GIF} with {len(frames)} frames.")
-
-        if not ONE_A_DAY:
-            break
+            print(f"Saved {OUTPUT_GIF} with {len(frames)} frames - {len(names)} artists - {names}")
 
         # rotate groups
-        grouped_frames.append(grouped_frames.pop(0))
-        grouped_durations.append(grouped_durations.pop(0))
+        num_to_shift = 1
+        if SEGREGATE_GIFS:
+            num_to_shift = artists_per_gif
+        for i in range(num_to_shift):
+            grouped_frames.append(grouped_frames.pop(0))
+            grouped_durations.append(grouped_durations.pop(0))
+            grouped_names.append(grouped_names.pop(0))
 
 
 if __name__ == "__main__":
