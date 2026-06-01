@@ -84,7 +84,7 @@ def main() -> None:
 
     num_artists = len(grouped_names)
     num_gifs = NUM_BANNERS
-    if NUM_BANNERS is 0:
+    if NUM_BANNERS == 0:
         num_gifs = num_artists
 
     artists_per_gif = num_artists
