@@ -127,6 +127,7 @@ def main() -> None:
         num_gifs = num_artists
 
     artists_per_gif = num_artists
+    gifs_to_pad = num_artists % num_gifs
     if SEGREGATE_GIFS:
         artists_per_gif = math.floor(num_artists / num_gifs) 
 
@@ -137,7 +138,7 @@ def main() -> None:
         names: List[str] = []
 
         # Account for rounding in the final gif
-        if index == num_gifs - 1:
+        if index == num_gifs - gifs_to_pad:
             artists_per_gif += 1
 
         for artist_index in range(artists_per_gif):
