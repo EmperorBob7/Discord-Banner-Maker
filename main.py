@@ -10,7 +10,7 @@ FRAME_DURATION: int = 3000
 WIDTH: int = 1920 # Minimum resolution is 960x540, Size Max is 10MB
 TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
 
-NUM_BANNERS = 3 # 0 for one for every artist, X otherwise
+NUM_BANNERS = 9 # 0 for one for every artist, X otherwise
 SEGREGATE_GIFS = True # False if you want all banners in every gif
 
 def get_images(folder: str) -> List[str]:
@@ -61,8 +61,16 @@ def main() -> None:
     grouped: list[List[str]] = list(group_images(images).values())
     random.shuffle(grouped)
 
-    for frames_group in grouped:
-        random.shuffle(frames_group)
+    # Comment Below if Bob not participating
+    while True:
+        lastGroup = "".join(grouped[-1])
+        if not "bob" in lastGroup:
+            random.shuffle(grouped)
+        else:
+            break
+        
+    print("".join(lastGroup))
+    print("Grouped",  grouped)
 
     # Load all images + durations
     grouped_frames: List[List[Image.Image]] = []
@@ -89,13 +97,18 @@ def main() -> None:
 
     artists_per_gif = num_artists
     if SEGREGATE_GIFS:
-        artists_per_gif = math.ceil(num_artists / num_gifs) 
+        artists_per_gif = math.floor(num_artists / num_gifs) 
 
     seg_total_artists = 0
     for index in range(num_gifs):
         frames: List[Image.Image] = []
         durations: List[int] = []
         names: List[str] = []
+
+        # Account for rounding in the final gif
+        if index == num_gifs - 1:
+            artists_per_gif += 1
+
         for artist_index in range(artists_per_gif):
             if SEGREGATE_GIFS and seg_total_artists >= num_artists:
                 break
@@ -111,7 +124,11 @@ def main() -> None:
             durations_group = grouped_durations[artist_index]
             for d in durations_group:
                 durations.append(d)
-            names.append(grouped_names[artist_index])
+            name = grouped_names[artist_index]
+            name = name[name.rfind("/") + 1:]
+            if "." in name:
+                name = name[:name.rfind(".")]
+            names.append(name)
         
         # Make the gif
         if frames:
