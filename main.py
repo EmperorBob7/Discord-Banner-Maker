@@ -13,6 +13,8 @@ TARGET_SIZE: Tuple[int, int] = (WIDTH, int(WIDTH * 9 / 16))
 NUM_BANNERS = 9 # 0 for one for every artist, X otherwise
 SEGREGATE_GIFS = True # False if you want all banners in every gif
 
+FIXED_LENGTH_SUBMISSION_GIFS = True # Extend short gifs, trim long gifs to equal FRAME_DURATION
+
 def get_images(folder: str) -> List[str]:
     exts: tuple = ('.png', '.jpg', '.jpeg', '.bmp', '.gif')
     return [os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(exts)]
@@ -34,8 +36,10 @@ def group_images(images: List[str]) -> Dict[str, List[str]]:
     pprint.pprint(groups)
     return groups
 
-def load_image_preserving_gif(path: str) -> Tuple[List[Image.Image], List[int]]:
-    """Load an image. If GIF, preserve all frames + durations."""
+def load_image_preserving_gif(
+    path: str, fixed_gif_timing: bool = True
+) -> Tuple[List[Image.Image], List[int]]:
+    """Load an image. If GIF, loop/trim its frames to total FRAME_DURATION ms."""
     img = Image.open(path)
 
     if img.format == "GIF":
@@ -46,9 +50,36 @@ def load_image_preserving_gif(path: str) -> Tuple[List[Image.Image], List[int]]:
             frames.append(
                 frame.convert("RGBA").resize(TARGET_SIZE, Image.Resampling.LANCZOS)
             )
-            durations.append(frame.info.get("duration", FRAME_DURATION))
+            d = frame.info.get("duration", FRAME_DURATION)
+            # 0ms durations would cause an infinite loop; browsers treat them as ~100ms
+            durations.append(d if d > 0 else 100)
 
-        return frames, durations
+        loop_total = sum(durations)
+        print(f"{loop_total=}")
+        print(f"{durations=}")
+
+        # Long GIF and the caller wants it left alone
+        if loop_total >= FRAME_DURATION and not fixed_gif_timing:
+            return frames, durations
+
+        out_frames: List[Image.Image] = []
+        out_durations: List[int] = []
+        elapsed = 0
+
+        # Repeat the GIF until we hit FRAME_DURATION; the last loop is cut short
+        while elapsed < FRAME_DURATION:
+            for frame, d in zip(frames, durations):
+                remaining = FRAME_DURATION - elapsed
+                if remaining <= 0:
+                    break
+                d = min(d, remaining)
+                out_frames.append(frame)
+                out_durations.append(d)
+                elapsed += d
+            if not fixed_gif_timing:
+                break
+
+        return out_frames, out_durations
 
     # Non-gif -> single frame image
     frame = img.convert("RGBA").resize(TARGET_SIZE, Image.Resampling.LANCZOS)
@@ -83,7 +114,7 @@ def main() -> None:
         sorted_group = sorted(frames_group)
         print(f"Sorted Group: {sorted_group}")
         for path in sorted_group:
-            f, d = load_image_preserving_gif(path)
+            f, d = load_image_preserving_gif(path, FIXED_LENGTH_SUBMISSION_GIFS)
             frames.extend(f)
             durations.extend(d)
         grouped_frames.append(frames)
