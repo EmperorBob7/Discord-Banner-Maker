@@ -90,17 +90,17 @@ def main() -> None:
 
     images: List[str] = get_images(IMAGE_FOLDER)
     grouped: list[List[str]] = list(group_images(images).values())
+    print(images)
     random.shuffle(grouped)
 
-    # Comment Below if Bob not participating
-    while True:
-        lastGroup = "".join(grouped[-1])
-        if not "bob" in lastGroup:
-            random.shuffle(grouped)
-        else:
-            break
+    if "bob" in " ".join(images).lower():
+        while True:
+            lastGroup = "".join(grouped[-1])
+            if not "bob" in lastGroup:
+                random.shuffle(grouped)
+            else:
+                break
         
-    print("".join(lastGroup))
     print("Grouped",  grouped)
 
     # Load all images + durations
