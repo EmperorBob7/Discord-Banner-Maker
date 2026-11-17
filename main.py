@@ -132,6 +132,7 @@ def main() -> None:
         artists_per_gif = math.floor(num_artists / num_gifs) 
 
     seg_total_artists = 0
+    image_index = 0
     for index in range(num_gifs):
         frames: List[Image.Image] = []
         durations: List[int] = []
@@ -164,7 +165,8 @@ def main() -> None:
         
         # Make the gif
         if frames:
-            OUTPUT_GIF = f"./outputGifs/File{index}.gif"
+            OUTPUT_GIF = f"./outputGifs/File{image_index}.gif"
+            image_index += 1
             frames[0].save(
                 OUTPUT_GIF,
                 save_all=True,
